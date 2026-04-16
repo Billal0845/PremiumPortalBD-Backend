@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Storage; // Added
 
 class Product extends Model
 {
@@ -20,12 +21,26 @@ class Product extends Model
         'featured_image',
         'requires_email',
         'status',
+        'rating',
+        'rating_count'
     ];
 
     protected $casts = [
         'requires_email' => 'boolean',
         'status' => 'boolean',
     ];
+
+    // This makes sure the URL is included when the model is converted to JSON
+    protected $appends = ['featured_image_url'];
+
+    public function getFeaturedImageUrlAttribute()
+    {
+        if ($this->featured_image) {
+            // Returns the full URL (e.g., http://localhost:8000/storage/products/xyz.jpg)
+            return asset('storage/' . $this->featured_image);
+        }
+        return null;
+    }
 
     public function category(): BelongsTo
     {
