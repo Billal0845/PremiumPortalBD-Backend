@@ -28,7 +28,7 @@ class ProductPackageController extends Controller
         $request->validate([
             'product_id' => ['required', 'exists:products,id'],
             'package_name' => ['required', 'string', 'max:255'],
-            'duration_label' => ['nullable', 'string', 'max:255'],
+            'duration_months' => ['nullable', 'integer', 'min:1'], // CHANGED HERE
             'price' => ['required', 'numeric', 'min:0'],
             'compare_price' => ['nullable', 'numeric', 'min:0'],
             'is_default' => ['nullable', 'boolean'],
@@ -44,7 +44,7 @@ class ProductPackageController extends Controller
         $package = ProductPackage::create([
             'product_id' => $request->product_id,
             'package_name' => $request->package_name,
-            'duration_label' => $request->duration_label,
+            'duration_months' => $request->duration_months,
             'price' => $request->price,
             'compare_price' => $request->compare_price,
             'is_default' => $request->boolean('is_default'),
@@ -72,7 +72,7 @@ class ProductPackageController extends Controller
         $request->validate([
             'product_id' => ['required', 'exists:products,id'],
             'package_name' => ['required', 'string', 'max:255'],
-            'duration_label' => ['nullable', 'string', 'max:255'],
+            'duration_months' => ['nullable', 'integer', 'min:1'], // CHANGED HERE
             'price' => ['required', 'numeric', 'min:0'],
             'compare_price' => ['nullable', 'numeric', 'min:0'],
             'is_default' => ['nullable', 'boolean'],
@@ -89,7 +89,7 @@ class ProductPackageController extends Controller
         $productPackage->update([
             'product_id' => $request->product_id,
             'package_name' => $request->package_name,
-            'duration_label' => $request->duration_label,
+            'duration_months' => $request->duration_months,
             'price' => $request->price,
             'compare_price' => $request->compare_price,
             'is_default' => $request->boolean('is_default'),

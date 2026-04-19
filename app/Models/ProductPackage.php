@@ -11,7 +11,7 @@ class ProductPackage extends Model
     protected $fillable = [
         'product_id',
         'package_name',
-        'duration_label',
+        'duration_months',
         'price',
         'compare_price',
         'is_default',
@@ -22,6 +22,7 @@ class ProductPackage extends Model
     protected $casts = [
         'price' => 'decimal:2',
         'compare_price' => 'decimal:2',
+        'duration_months' => 'integer',
         'is_default' => 'boolean',
         'sort_order' => 'integer',
         'status' => 'boolean',
