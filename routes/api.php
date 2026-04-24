@@ -20,6 +20,11 @@ Route::get('/products/{slug}', [PublicProductController::class, 'show']);
 Route::get('/categories', [PublicCategoryController::class, 'index']);
 Route::get('/categories/{slug}', [PublicCategoryController::class, 'show']);
 Route::post('/orders', [OrderController::class, 'store']);
+Route::get('/homepage-data', [PublicProductController::class, 'homepageData']);
+
+Route::get('/payment/success', [OrderController::class, 'paymentSuccess']);
+Route::get('/payment/fail', [OrderController::class, 'paymentFail']);
+Route::get('/payment/cancel', [OrderController::class, 'paymentCancel']);
 
 // protected
 Route::middleware('auth:sanctum')->group(function () {

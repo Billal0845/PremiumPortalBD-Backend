@@ -13,15 +13,30 @@ class Category extends Model
         'slug',
         'photo',
         'status',
+        'show_on_home',
+        'home_sort_order',
     ];
 
     protected $casts = [
         'status' => 'boolean',
+        'show_on_home' => 'boolean',
+        'home_sort_order' => 'integer',
     ];
+
+    // Make sure the photo_url is appended to the JSON response
+    protected $appends = ['photo_url'];
+
+    // Accessor for the full photo URL
+    public function getPhotoUrlAttribute()
+    {
+        if ($this->photo) {
+            return asset('storage/' . $this->photo);
+        }
+        return null;
+    }
 
     public function products(): HasMany
     {
         return $this->hasMany(Product::class);
     }
-
 }

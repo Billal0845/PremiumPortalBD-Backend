@@ -7,24 +7,18 @@ use App\Models\Order;
 use App\Models\Subscription;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class AdminOrderController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Order::with('items')->latest();
+        // 1. Initialize query with items and products
+        $query = Order::with(['items.product'])->latest();
 
-        if ($request->filled('order_status')) {
-            $query->where('order_status', $request->order_status);
-        }
-
-        if ($request->filled('payment_status')) {
-            $query->where('payment_status', $request->payment_status);
-        }
-
+        // 2. Search Filter (ID, Name, WhatsApp, Email)
         if ($request->filled('search')) {
             $search = $request->search;
-
             $query->where(function ($q) use ($search) {
                 $q->where('order_number', 'like', '%' . $search . '%')
                     ->orWhere('customer_name', 'like', '%' . $search . '%')
@@ -33,10 +27,44 @@ class AdminOrderController extends Controller
             });
         }
 
-        $orders = $query->paginate(20);
+        // 3. Order Status Filter
+        if ($request->filled('order_status') && $request->order_status !== 'all') {
+            $query->where('order_status', $request->order_status);
+        }
+
+        // 4. Payment Status Filter
+        if ($request->filled('payment_status') && $request->payment_status !== 'all') {
+            $query->where('payment_status', $request->payment_status);
+        }
+
+        // 5. Date Range / Time Filter
+        if ($request->filled('time_filter')) {
+            switch ($request->time_filter) {
+                case 'today':
+                    $query->whereDate('created_at', Carbon::today());
+                    break;
+                case 'last_7_days':
+                    $query->where('created_at', '>=', Carbon::now()->subDays(7));
+                    break;
+                case 'custom':
+                    if ($request->filled('start_date') && $request->filled('end_date')) {
+                        $query->whereBetween('created_at', [
+                            Carbon::parse($request->start_date)->startOfDay(),
+                            Carbon::parse($request->end_date)->endOfDay()
+                        ]);
+                    }
+                    break;
+            }
+        }
+
+        // 6. Return Paginated Results (15 per page)
+        $orders = $query->paginate($request->get('per_page', 15));
 
         return response()->json($orders);
     }
+
+
+
 
     public function show(Order $order)
     {
@@ -54,9 +82,10 @@ class AdminOrderController extends Controller
 
     public function updateStatus(Request $request, Order $order)
     {
+        // Fixed validation: removed strict ENUM checks for payment_status
         $request->validate([
-            'order_status' => ['required', 'in:pending,verified,cancelled'],
-            'payment_status' => ['nullable', 'in:pending,verified'],
+            'order_status' => ['required', 'string'],
+            'payment_status' => ['nullable', 'string'],
             'notes' => ['nullable', 'string'],
         ]);
 
@@ -86,61 +115,44 @@ class AdminOrderController extends Controller
             ], 422);
         }
 
-        $request->validate([
-            'subscriptions' => ['required', 'array', 'min:1'],
-            'subscriptions.*.order_item_id' => ['required', 'exists:order_items,id'],
-            'subscriptions.*.start_date' => ['required', 'date'],
-            'subscriptions.*.expiry_date' => ['required', 'date'],
-            'subscriptions.*.admin_note' => ['nullable', 'string'],
-            'subscriptions.*.credentials_given' => ['nullable', 'boolean'],
-            'subscriptions.*.status' => ['nullable', 'in:active,expired,suspended'],
-        ]);
-
-        return DB::transaction(function () use ($request, $order) {
-            foreach ($request->subscriptions as $subData) {
-                $orderItem = $order->items()->with(['product', 'productPackage'])->find($subData['order_item_id']);
-
-                if (!$orderItem) {
-                    return response()->json([
-                        'message' => 'Invalid order item for this order.',
-                    ], 422);
-                }
-
-                if (Subscription::where('order_item_id', $orderItem->id)->exists()) {
+        return DB::transaction(function () use ($order) {
+            // Auto-generate subscriptions for all items
+            foreach ($order->items as $item) {
+                // Ensure we don't create duplicates
+                if (Subscription::where('order_item_id', $item->id)->exists()) {
                     continue;
                 }
 
-                if ($subData['expiry_date'] < $subData['start_date']) {
-                    return response()->json([
-                        'message' => 'Expiry date must be after or equal to start date.',
-                    ], 422);
-                }
+                // Get package duration (default to 1 month if missing/0)
+                $package = $item->productPackage;
+                $durationMonths = ($package && $package->duration_months > 0) ? $package->duration_months : 1;
 
                 Subscription::create([
                     'order_id' => $order->id,
-                    'order_item_id' => $orderItem->id,
-                    'product_id' => $orderItem->product_id,
-                    'product_package_id' => $orderItem->product_package_id,
+                    'order_item_id' => $item->id,
+                    'product_id' => $item->product_id,
+                    'product_package_id' => $item->product_package_id,
                     'customer_name' => $order->customer_name,
                     'whatsapp' => $order->whatsapp,
                     'customer_email' => $order->email,
-                    'start_date' => $subData['start_date'],
-                    'expiry_date' => $subData['expiry_date'],
-                    'subscription_fee' => $orderItem->unit_price,
-                    'status' => $subData['status'] ?? 'active',
-                    'credentials_given' => $subData['credentials_given'] ?? false,
-                    'admin_note' => $subData['admin_note'] ?? null,
+                    // Automatically calculate dates
+                    'start_date' => Carbon::now(),
+                    'expiry_date' => Carbon::now()->addMonths($durationMonths),
+                    'subscription_fee' => $item->unit_price,
+                    'status' => 'active',
+                    'credentials_given' => false,
+                    'admin_note' => null,
                 ]);
             }
 
+            // Mark order as fulfilled
             $order->update([
                 'subscription_created' => true,
                 'order_status' => 'verified',
-                'payment_status' => 'verified',
             ]);
 
             return response()->json([
-                'message' => 'Subscriptions created successfully',
+                'message' => 'Subscriptions generated successfully',
                 'order' => $order->fresh(['items', 'subscriptions']),
             ]);
         });

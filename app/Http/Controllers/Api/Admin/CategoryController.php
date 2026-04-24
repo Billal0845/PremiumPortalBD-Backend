@@ -25,10 +25,13 @@ class CategoryController extends Controller
 
     public function store(Request $request)
     {
+
         $request->validate([
             'name' => ['required', 'string', 'max:255', 'unique:categories,name'],
             'slug' => ['nullable', 'string', 'max:255', 'unique:categories,slug'],
             'status' => ['nullable', 'boolean'],
+            'show_on_home' => ['nullable', 'boolean'],
+            'home_sort_order' => ['nullable', 'integer'],
             'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
         ]);
 
@@ -42,6 +45,8 @@ class CategoryController extends Controller
             'name' => $request->name,
             'slug' => $request->slug ?: Str::slug($request->name),
             'status' => $request->has('status') ? $request->boolean('status') : true,
+            'show_on_home' => $request->has('show_on_home') ? $request->boolean('show_on_home') : false,
+            'home_sort_order' => $request->home_sort_order ?? 0,
             'photo' => $photoPath,
         ]);
 
@@ -64,6 +69,8 @@ class CategoryController extends Controller
             'name' => ['required', 'string', 'max:255', 'unique:categories,name,' . $category->id],
             'slug' => ['nullable', 'string', 'max:255', 'unique:categories,slug,' . $category->id],
             'status' => ['nullable', 'boolean'],
+            'show_on_home' => ['nullable', 'boolean'],
+            'home_sort_order' => ['nullable', 'integer'],
             'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
         ]);
 
@@ -81,6 +88,8 @@ class CategoryController extends Controller
             'name' => $request->name,
             'slug' => $request->slug ?: Str::slug($request->name),
             'status' => $request->has('status') ? $request->boolean('status') : $category->status,
+            'show_on_home' => $request->has('show_on_home') ? $request->boolean('show_on_home') : $category->show_on_home,
+            'home_sort_order' => $request->has('home_sort_order') ? $request->home_sort_order : $category->home_sort_order,
             'photo' => $photoPath,
         ]);
 

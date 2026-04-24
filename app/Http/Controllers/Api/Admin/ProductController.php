@@ -34,6 +34,9 @@ class ProductController extends Controller
             'specification' => ['nullable', 'string'],
             'requires_email' => ['nullable', 'boolean'],
             'status' => ['nullable', 'boolean'],
+            'is_top_selling' => ['nullable', 'boolean'],
+            'is_trending' => ['nullable', 'boolean'],
+            'is_new_arrival' => ['nullable', 'boolean'],
             'featured_image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
             'rating' => ['nullable', 'numeric', 'min:0', 'max:5'],
             'rating_count' => ['nullable', 'integer', 'min:0'],
@@ -57,6 +60,9 @@ class ProductController extends Controller
             'featured_image' => $featuredImagePath,
             'requires_email' => $request->has('requires_email') ? $request->boolean('requires_email') : false,
             'status' => $request->has('status') ? $request->boolean('status') : true,
+            'is_top_selling' => $request->has('is_top_selling') ? $request->boolean('is_top_selling') : false,
+            'is_trending' => $request->has('is_trending') ? $request->boolean('is_trending') : false,
+            'is_new_arrival' => $request->has('is_new_arrival') ? $request->boolean('is_new_arrival') : false,
             'rating' => $request->rating ?? 0,
             'rating_count' => $request->rating_count ?? 0,
         ]);
@@ -89,6 +95,9 @@ class ProductController extends Controller
             'specification' => ['nullable', 'string'],
             'requires_email' => ['nullable', 'boolean'],
             'status' => ['nullable', 'boolean'],
+            'is_top_selling' => ['nullable', 'boolean'],
+            'is_trending' => ['nullable', 'boolean'],
+            'is_new_arrival' => ['nullable', 'boolean'],
             'featured_image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
             'rating' => ['nullable', 'numeric', 'min:0', 'max:5'],
             'rating_count' => ['nullable', 'integer', 'min:0'],
@@ -122,6 +131,9 @@ class ProductController extends Controller
             'status' => $request->has('status')
                 ? $request->boolean('status')
                 : $product->status,
+            'is_top_selling' => $request->has('is_top_selling') ? $request->boolean('is_top_selling') : false,
+            'is_trending' => $request->has('is_trending') ? $request->boolean('is_trending') : false,
+            'is_new_arrival' => $request->has('is_new_arrival') ? $request->boolean('is_new_arrival') : false,
         ]);
 
         return response()->json([

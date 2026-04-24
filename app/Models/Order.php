@@ -9,13 +9,14 @@ class Order extends Model
 {
     protected $fillable = [
         'order_number',
+        'merchant_transaction_id', // Added
+        'eps_transaction_id',      // Added
         'customer_name',
         'whatsapp',
         'email',
         'total_amount',
         'order_status',
         'payment_status',
-        'screenshot_path',
         'notes',
         'subscription_created',
     ];

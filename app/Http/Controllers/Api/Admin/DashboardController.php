@@ -13,25 +13,39 @@ class DashboardController extends Controller
     {
         [$startDate, $endDate] = $this->resolveDateRange($request);
 
-        // Total Sales
-        $totalSales = Order::where('order_status', 'verified')
+        // 1. Total Revenue: Total price of the paid order in that date range
+        $totalSales = Order::where('payment_status', 'completed')
             ->whereBetween('created_at', [$startDate, $endDate])
             ->sum('total_amount');
 
-        // Total Orders
+        // 2. Total Orders: Number of orders in that date range
         $totalOrders = Order::whereBetween('created_at', [$startDate, $endDate])
             ->count();
 
-        // Active Subscriptions
-        $activeSubscriptions = Subscription::where('status', 'active')
-            ->whereBetween('created_at', [$startDate, $endDate])
-            ->count();
+        // 3. Active Subs: Global count of active subscriptions (not bound by date range)
+        $activeSubscriptions = Subscription::where('status', 'active')->count();
 
-        // Expiring Soon (next 7 days)
+        // 4. Expiring Soon: Active subscriptions expiring in the next 7 days
         $expiringSoon = Subscription::where('status', 'active')
             ->whereDate('expiry_date', '>=', now()->toDateString())
             ->whereDate('expiry_date', '<=', now()->addDays(7)->toDateString())
             ->count();
+
+        // Get Recent Orders
+        // Removed `with('user')` because your Order model uses `customer_name` directly
+        $recentOrders = Order::latest()
+            ->take(5)
+            ->get()
+            ->map(function ($order) {
+                return [
+                    'id' => $order->order_number ?? '#ORD-' . $order->id,
+                    'customer' => $order->customer_name ?? 'Guest',
+                    'product' => 'Subscription/Package',
+                    'amount' => '৳ ' . number_format($order->total_amount, 2),
+                    'status' => $order->order_status,
+                    'date' => $order->created_at->diffForHumans(),
+                ];
+            });
 
         return response()->json([
             'kpis' => [
@@ -40,6 +54,7 @@ class DashboardController extends Controller
                 'active_subscriptions' => $activeSubscriptions,
                 'expiring_soon' => $expiringSoon,
             ],
+            'recent_orders' => $recentOrders,
             'filters' => [
                 'start_date' => $startDate,
                 'end_date' => $endDate,
@@ -63,14 +78,14 @@ class DashboardController extends Controller
             return [now()->startOfMonth(), now()->endOfDay()];
         }
 
-        if ($request->filled('start_date') && $request->filled('end_date')) {
+        // Handle Custom Dates
+        if ($filter === 'custom' && $request->filled('start_date') && $request->filled('end_date')) {
             return [
                 \Carbon\Carbon::parse($request->start_date)->startOfDay(),
                 \Carbon\Carbon::parse($request->end_date)->endOfDay(),
             ];
         }
 
-        // default → this month
         return [now()->startOfMonth(), now()->endOfDay()];
     }
 }

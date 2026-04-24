@@ -22,12 +22,18 @@ class Product extends Model
         'requires_email',
         'status',
         'rating',
-        'rating_count'
+        'rating_count',
+        'is_top_selling',
+        'is_trending',
+        'is_new_arrival',
     ];
 
     protected $casts = [
         'requires_email' => 'boolean',
         'status' => 'boolean',
+        'is_top_selling' => 'boolean',
+        'is_trending' => 'boolean',
+        'is_new_arrival' => 'boolean',
     ];
 
     // This makes sure the URL is included when the model is converted to JSON

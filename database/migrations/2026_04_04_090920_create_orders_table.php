@@ -22,7 +22,7 @@ return new class extends Migration {
             $table->decimal('total_amount', 10, 2)->default(0);
 
             $table->enum('order_status', ['pending', 'verified', 'cancelled'])->default('pending');
-            $table->enum('payment_status', ['pending', 'verified'])->default('pending');
+            $table->enum('payment_status', ['pending', 'completed'])->default('pending');
 
             $table->string('screenshot_path');
             $table->text('notes')->nullable();
