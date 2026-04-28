@@ -26,6 +26,9 @@ Route::get('/payment/success', [OrderController::class, 'paymentSuccess']);
 Route::get('/payment/fail', [OrderController::class, 'paymentFail']);
 Route::get('/payment/cancel', [OrderController::class, 'paymentCancel']);
 
+
+
+
 // protected
 Route::middleware('auth:sanctum')->group(function () {
   Route::get('/admin/me', [AuthController::class, 'me']);

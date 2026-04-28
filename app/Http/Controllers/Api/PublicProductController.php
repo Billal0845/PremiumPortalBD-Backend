@@ -35,7 +35,7 @@ class PublicProductController extends Controller
             });
         }
 
-        // 3. Filter by Homepage Flags (e.g. View All Top Selling)
+        // 3. Filter by Homepage Flags
         if ($request->filled('filter')) {
             if ($request->filter === 'top-selling')
                 $query->where('is_top_selling', true);
@@ -45,6 +45,20 @@ class PublicProductController extends Controller
                 $query->where('is_new_arrival', true);
         }
 
+        // -----------------------------------------------------
+        // ADDED: Filter by Minimum and Maximum Price
+        // -----------------------------------------------------
+        if ($request->filled('min_price') || $request->filled('max_price')) {
+            $query->whereHas('packages', function ($q) use ($request) {
+                if ($request->filled('min_price')) {
+                    $q->where('price', '>=', $request->min_price);
+                }
+                if ($request->filled('max_price')) {
+                    $q->where('price', '<=', $request->max_price);
+                }
+            });
+        }
+
         // 4. Sorting logic
         $sort = $request->input('sort', 'latest');
         if ($sort === 'latest') {
@@ -52,18 +66,16 @@ class PublicProductController extends Controller
         } elseif ($sort === 'top_rated') {
             $query->orderBy('rating', 'desc');
         } elseif ($sort === 'price_low') {
-            // Sort by the default package price (Ascending)
             $query->orderBy(\App\Models\ProductPackage::select('price')
                 ->whereColumn('product_id', 'products.id')
                 ->where('status', true)->orderBy('is_default', 'desc')->limit(1), 'asc');
         } elseif ($sort === 'price_high') {
-            // Sort by the default package price (Descending)
             $query->orderBy(\App\Models\ProductPackage::select('price')
                 ->whereColumn('product_id', 'products.id')
                 ->where('status', true)->orderBy('is_default', 'desc')->limit(1), 'desc');
         }
 
-        // 5. Paginate results (12 products per page)
+        // 5. Paginate results
         $products = $query->paginate(12);
 
         return response()->json($products);
@@ -111,6 +123,7 @@ class PublicProductController extends Controller
 
     public function show($slug)
     {
+        // 1. Fetch the main product
         $product = Product::with([
             'category:id,name,slug',
             'packages' => function ($q) {
@@ -121,8 +134,22 @@ class PublicProductController extends Controller
             ->where('status', true)
             ->firstOrFail();
 
+        // 2. Fetch related products (same category, excluding current product)
+        $relatedProducts = Product::with([
+            'packages' => function ($q) {
+                $q->where('status', true)->orderBy('sort_order');
+            }
+        ])
+            ->where('category_id', $product->category_id)
+            ->where('id', '!=', $product->id)
+            ->where('status', true)
+            ->take(5) // Limit to 5 related products
+            ->get();
+
+        // 3. Return both in the response
         return response()->json([
             'product' => $product,
+            'related_products' => $relatedProducts,
         ]);
     }
 
