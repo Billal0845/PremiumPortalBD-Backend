@@ -11,7 +11,10 @@ use App\Models\ProductPackage;
 use App\Services\EpsPaymentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+
 
 class OrderController extends Controller
 {
@@ -47,6 +50,7 @@ class OrderController extends Controller
                     'whatsapp' => $request->whatsapp,
                     'email' => $request->email,
                     'total_amount' => 0,
+                    'event_id' => $request->event_id, //facebook pixel
                     'order_status' => 'pending',
                     'payment_status' => 'pending',
                     'notes' => $request->notes,
@@ -107,8 +111,8 @@ class OrderController extends Controller
 
     public function paymentSuccess(Request $request)
     {
-        \Illuminate\Support\Facades\Log::info('--- EPS SUCCESS CALLBACK HIT ---');
-        \Illuminate\Support\Facades\Log::info('Callback URL Params: ', $request->all());
+        Log::info('--- EPS SUCCESS CALLBACK HIT ---');
+        Log::info('Callback URL Params: ', $request->all());
 
         // EPS actually sends 'MerchantTransactionId' with a capital 'M'
         $merchantTransactionId = $request->input('MerchantTransactionId')
@@ -116,21 +120,21 @@ class OrderController extends Controller
             ?? $request->input('data');
 
         if (!$merchantTransactionId) {
-            \Illuminate\Support\Facades\Log::error('EPS Callback Error: No transaction ID found in URL.');
+            Log::error('EPS Callback Error: No transaction ID found in URL.');
             return redirect()->to(config('eps.frontend_url') . '/checkout/status?status=failed');
         }
 
         $order = Order::where('merchant_transaction_id', $merchantTransactionId)->first();
 
         if (!$order) {
-            \Illuminate\Support\Facades\Log::error('EPS Callback Error: Order not found for ID: ' . $merchantTransactionId);
+            Log::error('EPS Callback Error: Order not found for ID: ' . $merchantTransactionId);
             return redirect()->to(config('eps.frontend_url') . '/checkout/status?status=failed');
         }
 
         try {
             // Verify the transaction strictly with EPS API
             $verifyResponse = $this->epsService->verifyTransaction($merchantTransactionId);
-            \Illuminate\Support\Facades\Log::info('EPS Verification API Response: ', $verifyResponse ?? []);
+            Log::info('EPS Verification API Response: ', $verifyResponse ?? []);
 
             $status = $verifyResponse['Status'] ?? $verifyResponse['status'] ?? '';
 
@@ -151,26 +155,64 @@ class OrderController extends Controller
                     'related_order_id' => $order->id,
                 ]);
 
+
+                // --- NEW: FACEBOOK CONVERSIONS API ---
+                try {
+                    $pixelId = env('FB_PIXEL_ID');
+                    $accessToken = env('FB_CAPI_TOKEN');
+
+                    if ($pixelId && $accessToken && $order->event_id) {
+                        Http::post("https://graph.facebook.com/v18.0/{$pixelId}/events", [
+                            'access_token' => $accessToken,
+                            'data' => [
+                                [
+                                    'event_name' => 'Purchase',
+                                    'event_time' => time(),
+                                    'action_source' => 'website',
+                                    'event_id' => $order->event_id, // Matches frontend Pixel!
+                                    'user_data' => [
+                                        // Hashed user info (Meta requires SHA256)
+                                        'em' => $order->email ? hash('sha256', strtolower(trim($order->email))) : null,
+                                        'ph' => hash('sha256', '+88' . $order->whatsapp), // Assuming BD number format
+                                        'client_ip_address' => $request->ip(),
+                                        'client_user_agent' => $request->userAgent(),
+                                    ],
+                                    'custom_data' => [
+                                        'currency' => 'BDT',
+                                        'value' => (float) $order->total_amount,
+                                    ],
+                                ]
+                            ]
+                        ]);
+                    }
+                } catch (\Exception $e) {
+                    Log::error('FB CAPI Error: ' . $e->getMessage());
+                }
+                // --- END CAPI ---
+
+
                 return redirect()->to(config('eps.frontend_url') . '/checkout/status?status=success&order=' . $order->order_number);
             } else {
-                \Illuminate\Support\Facades\Log::error('EPS Callback Error: Verification Status was not SUCCESS.', $verifyResponse ?? []);
+                Log::error('EPS Callback Error: Verification Status was not SUCCESS.', $verifyResponse ?? []);
             }
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('EPS Callback Error: Exception during verification - ' . $e->getMessage());
+            Log::error('EPS Callback Error: Exception during verification - ' . $e->getMessage());
         }
+
+
 
         return redirect()->to(config('eps.frontend_url') . '/checkout/status?status=failed');
     }
 
     public function paymentFail(Request $request)
     {
-        \Illuminate\Support\Facades\Log::info('--- EPS FAIL CALLBACK HIT ---', $request->all());
+        Log::info('--- EPS FAIL CALLBACK HIT ---', $request->all());
         return redirect()->to(config('eps.frontend_url') . '/checkout/status?status=failed');
     }
 
     public function paymentCancel(Request $request)
     {
-        \Illuminate\Support\Facades\Log::info('--- EPS CANCEL CALLBACK HIT ---', $request->all());
+        Log::info('--- EPS CANCEL CALLBACK HIT ---', $request->all());
         return redirect()->to(config('eps.frontend_url') . '/checkout/status?status=cancelled');
     }
 }
