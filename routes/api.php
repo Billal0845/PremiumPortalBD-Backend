@@ -11,6 +11,8 @@ use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\Admin\AdminOrderController;
 use App\Http\Controllers\Api\Admin\SubscriptionController;
 use App\Http\Controllers\Api\Admin\DashboardController;
+use App\Http\Controllers\Api\Admin\SliderController;
+
 
 
 // public
@@ -72,9 +74,18 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::post('/admin/subscriptions/{subscription}', [SubscriptionController::class, 'update']);
   Route::post('/admin/subscriptions/{subscription}/status', [SubscriptionController::class, 'updateStatus']);
 
+  // Slider Management
+  Route::post('/admin/sliders/reorder', [SliderController::class, 'updateOrder']); // <--- Add this FIRST
+  Route::get('/admin/sliders', [SliderController::class, 'index']);
+  Route::post('/admin/sliders', [SliderController::class, 'store']);
+  Route::delete('/admin/sliders/{slider}', [SliderController::class, 'destroy']);
+
 
 
   Route::get('/admin/dashboard', [DashboardController::class, 'index']);
+
+
+
 
 
 

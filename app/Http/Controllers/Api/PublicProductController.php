@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Category;
 use Illuminate\Http\Request;
 use App\Models\Product;
+use App\Models\Slider;
 
 
 class PublicProductController extends Controller
@@ -112,8 +113,10 @@ class PublicProductController extends Controller
                 }
             ])
             ->get();
+        $sliders = Slider::where('is_active', true)->orderBy('order', 'asc')->get();
 
         return response()->json([
+            'sliders' => $sliders,
             'top_selling' => $topSelling,
             'trending' => $trending,
             'new_arrivals' => $newArrivals,
