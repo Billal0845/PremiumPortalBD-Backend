@@ -9,9 +9,11 @@ use App\Http\Controllers\Api\PublicProductController;
 use App\Http\Controllers\Api\PublicCategoryController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\Admin\AdminOrderController;
+use App\Http\Controllers\Api\Admin\BannerController;
 use App\Http\Controllers\Api\Admin\SubscriptionController;
 use App\Http\Controllers\Api\Admin\DashboardController;
 use App\Http\Controllers\Api\Admin\SliderController;
+
 
 
 
@@ -28,7 +30,7 @@ Route::get('/payment/success', [OrderController::class, 'paymentSuccess']);
 Route::get('/payment/fail', [OrderController::class, 'paymentFail']);
 Route::get('/payment/cancel', [OrderController::class, 'paymentCancel']);
 
-
+// Banner Management
 
 
 // protected
@@ -83,6 +85,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
   Route::get('/admin/dashboard', [DashboardController::class, 'index']);
+
+
+  Route::get('/admin/banners', [BannerController::class, 'index']);
+  Route::post('/admin/banners', [BannerController::class, 'store']);
+  Route::delete('/admin/banners/{banner}', [BannerController::class, 'destroy']);
 
 
 

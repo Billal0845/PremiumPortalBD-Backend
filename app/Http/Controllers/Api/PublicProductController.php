@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Banner;
 use App\Models\Category;
 use Illuminate\Http\Request;
 use App\Models\Product;
 use App\Models\Slider;
+use App\Models\ProductPackage;
+
 
 
 class PublicProductController extends Controller
@@ -67,11 +70,11 @@ class PublicProductController extends Controller
         } elseif ($sort === 'top_rated') {
             $query->orderBy('rating', 'desc');
         } elseif ($sort === 'price_low') {
-            $query->orderBy(\App\Models\ProductPackage::select('price')
+            $query->orderBy(ProductPackage::select('price')
                 ->whereColumn('product_id', 'products.id')
                 ->where('status', true)->orderBy('is_default', 'desc')->limit(1), 'asc');
         } elseif ($sort === 'price_high') {
-            $query->orderBy(\App\Models\ProductPackage::select('price')
+            $query->orderBy(ProductPackage::select('price')
                 ->whereColumn('product_id', 'products.id')
                 ->where('status', true)->orderBy('is_default', 'desc')->limit(1), 'desc');
         }
@@ -85,23 +88,22 @@ class PublicProductController extends Controller
 
     public function homepageData()
     {
-        // 1. Top Selling (Max 15)
         $topSelling = Product::with(['packages' => fn($q) => $q->where('status', true)->orderBy('sort_order')])
             ->where('status', true)->where('is_top_selling', true)->latest()->take(15)->get();
 
-
-
-        // 2. Trending (Max 10)
         $trending = Product::with(['packages' => fn($q) => $q->where('status', true)->orderBy('sort_order')])
             ->where('status', true)->where('is_trending', true)->latest()->take(10)->get();
 
-        // 3. New Arrivals (Max 10)
         $newArrivals = Product::with(['packages' => fn($q) => $q->where('status', true)->orderBy('sort_order')])
             ->where('status', true)->where('is_new_arrival', true)->latest()->take(10)->get();
 
-        // 4. Categories admin chose to show on home (Max 10 products per category)
+        $sliders = Slider::where('is_active', true)->orderBy('order', 'asc')->get();
 
-        $categories = Category::where('status', true)
+        // 1. Fetch Banners
+        $banners = Banner::where('is_active', true)->get()->keyBy('position');
+
+        // 2. Fetch all active home categories
+        $allCategories = Category::where('status', true)
             ->where('show_on_home', true)
             ->orderBy('home_sort_order')
             ->with([
@@ -111,18 +113,72 @@ class PublicProductController extends Controller
                         ->take(10)
                         ->with(['packages' => fn($q) => $q->where('status', true)->orderBy('sort_order')]);
                 }
-            ])
-            ->get();
-        $sliders = Slider::where('is_active', true)->orderBy('order', 'asc')->get();
+            ])->get();
+
+        // 3. Extract Specific Categories based on your slugs
+        $aiToolsCategory = $allCategories->firstWhere('slug', 'popular-ai-tools');
+        $windowsCategory = $allCategories->firstWhere('slug', 'software-licenses');
+        $videoCategory = $allCategories->firstWhere('slug', 'video-editing-tools');
+
+        // 4. Filter out the specific ones to keep "Other Categories"
+        $otherCategories = $allCategories->filter(function ($cat) {
+            return !in_array($cat->slug, ['popular-ai-tools', 'software-licenses', 'video-editing-tools']);
+        })->values();
 
         return response()->json([
             'sliders' => $sliders,
             'top_selling' => $topSelling,
             'trending' => $trending,
             'new_arrivals' => $newArrivals,
-            'categories' => $categories,
+            'banners' => $banners,
+            // Separated Categories:
+            'ai_tools' => $aiToolsCategory,
+            'windows_tools' => $windowsCategory,
+            'video_tools' => $videoCategory,
+            'other_categories' => $otherCategories,
         ]);
     }
+
+    // public function homepageData()
+    // {
+    //     // 1. Top Selling (Max 15)
+    //     $topSelling = Product::with(['packages' => fn($q) => $q->where('status', true)->orderBy('sort_order')])
+    //         ->where('status', true)->where('is_top_selling', true)->latest()->take(15)->get();
+
+
+
+    //     // 2. Trending (Max 10)
+    //     $trending = Product::with(['packages' => fn($q) => $q->where('status', true)->orderBy('sort_order')])
+    //         ->where('status', true)->where('is_trending', true)->latest()->take(10)->get();
+
+    //     // 3. New Arrivals (Max 10)
+    //     $newArrivals = Product::with(['packages' => fn($q) => $q->where('status', true)->orderBy('sort_order')])
+    //         ->where('status', true)->where('is_new_arrival', true)->latest()->take(10)->get();
+
+    //     // 4. Categories admin chose to show on home (Max 10 products per category)
+
+    //     $categories = Category::where('status', true)
+    //         ->where('show_on_home', true)
+    //         ->orderBy('home_sort_order')
+    //         ->with([
+    //             'products' => function ($query) {
+    //                 $query->where('status', true)
+    //                     ->latest()
+    //                     ->take(10)
+    //                     ->with(['packages' => fn($q) => $q->where('status', true)->orderBy('sort_order')]);
+    //             }
+    //         ])
+    //         ->get();
+    //     $sliders = Slider::where('is_active', true)->orderBy('order', 'asc')->get();
+
+    //     return response()->json([
+    //         'sliders' => $sliders,
+    //         'top_selling' => $topSelling,
+    //         'trending' => $trending,
+    //         'new_arrivals' => $newArrivals,
+    //         'categories' => $categories,
+    //     ]);
+    // }
 
     public function show($slug)
     {
