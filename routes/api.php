@@ -13,6 +13,8 @@ use App\Http\Controllers\Api\Admin\BannerController;
 use App\Http\Controllers\Api\Admin\SubscriptionController;
 use App\Http\Controllers\Api\Admin\DashboardController;
 use App\Http\Controllers\Api\Admin\SliderController;
+use App\Http\Controllers\Api\Admin\PopupController;
+use App\Http\Controllers\Api\PublicPopupController;
 
 
 
@@ -29,6 +31,8 @@ Route::get('/homepage-data', [PublicProductController::class, 'homepageData']);
 Route::get('/payment/success', [OrderController::class, 'paymentSuccess']);
 Route::get('/payment/fail', [OrderController::class, 'paymentFail']);
 Route::get('/payment/cancel', [OrderController::class, 'paymentCancel']);
+
+Route::get('/active-popup', [PublicPopupController::class, 'getActivePopup']);
 
 // Banner Management
 
@@ -91,9 +95,11 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::post('/admin/banners', [BannerController::class, 'store']);
   Route::delete('/admin/banners/{banner}', [BannerController::class, 'destroy']);
 
-
-
-
+  // Popup Management
+  Route::get('/admin/popups', [PopupController::class, 'index']);
+  Route::post('/admin/popups', [PopupController::class, 'store']);
+  Route::post('/admin/popups/{popup}/status', [PopupController::class, 'updateStatus']);
+  Route::delete('/admin/popups/{popup}', [PopupController::class, 'destroy']);
 
 
 
