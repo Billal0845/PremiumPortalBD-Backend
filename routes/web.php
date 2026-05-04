@@ -1,6 +1,5 @@
 <?php
 
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -9,10 +8,6 @@ Route::get('/', function () {
 
 
 
-Route::get('/clear-my-cache', function () {
-    Artisan::call('cache:clear');
-    return 'Cache cleared successfully! Homepage will now show new updates.';
-});
 
 
 

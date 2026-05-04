@@ -17,8 +17,6 @@ use App\Http\Controllers\Api\Admin\PopupController;
 use App\Http\Controllers\Api\PublicPopupController;
 
 
-
-
 // public
 Route::post('/admin/login', [AuthController::class, 'login']);
 Route::get('/products', [PublicProductController::class, 'index']);

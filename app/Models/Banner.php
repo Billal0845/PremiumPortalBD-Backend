@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
+
 
 class Banner extends Model
 {
@@ -16,4 +18,17 @@ class Banner extends Model
         'position',
         'is_active',
     ];
+
+
+
+    protected static function booted()
+    {
+        static::saved(function () {
+            Cache::forget('homepage_data');
+        });
+
+        static::deleted(function () {
+            Cache::forget('homepage_data');
+        });
+    }
 }

@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Storage; // Added
+use Illuminate\Support\Facades\Cache;
 
 class Product extends Model
 {
@@ -67,4 +68,19 @@ class Product extends Model
     {
         return $this->hasMany(Subscription::class);
     }
+
+    protected static function booted()
+    {
+        static::saved(function ($product) {
+            Cache::forget('homepage_data');
+            Cache::forget('product_' . $product->slug); // Clears the single product page cache too
+        });
+
+        static::deleted(function ($product) {
+            Cache::forget('homepage_data');
+            Cache::forget('product_' . $product->slug);
+        });
+    }
+
+
 }
