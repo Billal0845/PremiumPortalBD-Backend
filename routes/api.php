@@ -24,7 +24,11 @@ Route::get('/products/{slug}', [PublicProductController::class, 'show']);
 Route::get('/categories', [PublicCategoryController::class, 'index']);
 Route::get('/categories/{slug}', [PublicCategoryController::class, 'show']);
 Route::post('/orders', [OrderController::class, 'store']);
-Route::get('/homepage-data', [PublicProductController::class, 'homepageData']);
+
+Route::get('/homepage/critical', [PublicProductController::class, 'homepageCritical']);
+Route::get('/homepage/deferred', [PublicProductController::class, 'homepageDeferred']);
+
+// Route::get('/homepage-data', [PublicProductController::class, 'homepageData']);
 
 Route::get('/payment/success', [OrderController::class, 'paymentSuccess']);
 Route::get('/payment/fail', [OrderController::class, 'paymentFail']);

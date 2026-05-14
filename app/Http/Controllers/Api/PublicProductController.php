@@ -9,10 +9,14 @@ use Illuminate\Http\Request;
 use App\Models\Product;
 use App\Models\Slider;
 use App\Models\ProductPackage;
-use Illuminate\Support\Facades\Cache; // Make sure this is imported!
+use Illuminate\Support\Facades\Cache;
+use App\Http\Resources\ProductMinimalResource; // <--- Added Resource
 
 class PublicProductController extends Controller
 {
+
+    // 1. Powers the Shop Page)
+
     public function index(Request $request)
     {
         $query = Product::with([
@@ -22,14 +26,14 @@ class PublicProductController extends Controller
             }
         ])->where('status', true);
 
-        // 1. Filter by Category Slug
+        // Filter by Category Slug
         if ($request->filled('category')) {
             $query->whereHas('category', function ($q) use ($request) {
                 $q->where('slug', $request->category);
             });
         }
 
-        // 2. Filter by Search Query
+        // Filter by Search Query
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
@@ -38,7 +42,7 @@ class PublicProductController extends Controller
             });
         }
 
-        // 3. Filter by Homepage Flags
+        // Filter by Homepage Flags
         if ($request->filled('filter')) {
             if ($request->filter === 'top-selling')
                 $query->where('is_top_selling', true);
@@ -48,21 +52,17 @@ class PublicProductController extends Controller
                 $query->where('is_new_arrival', true);
         }
 
-        // -----------------------------------------------------
-        // ADDED: Filter by Minimum and Maximum Price
-        // -----------------------------------------------------
+        // Filter by Minimum and Maximum Price
         if ($request->filled('min_price') || $request->filled('max_price')) {
             $query->whereHas('packages', function ($q) use ($request) {
-                if ($request->filled('min_price')) {
+                if ($request->filled('min_price'))
                     $q->where('price', '>=', $request->min_price);
-                }
-                if ($request->filled('max_price')) {
+                if ($request->filled('max_price'))
                     $q->where('price', '<=', $request->max_price);
-                }
             });
         }
 
-        // 4. Sorting logic
+        // Sorting logic
         $sort = $request->input('sort', 'latest');
         if ($sort === 'latest') {
             $query->latest();
@@ -78,83 +78,107 @@ class PublicProductController extends Controller
                 ->where('status', true)->orderBy('is_default', 'desc')->limit(1), 'desc');
         }
 
-        // 5. Paginate results
+        // Paginate results
         $products = $query->paginate(12);
 
         return response()->json($products);
     }
 
 
-    public function homepageData()
+    // ==========================================
+    // 2. NEW OPTIMIZED HOMEPAGE (CRITICAL DATA)
+    // ==========================================
+
+    public function homepageCritical()
     {
-        // Cache the homepage data for 3600 seconds (1 hour)
-        $data = Cache::remember('homepage_data', 3600, function () {
+        try {
+            $data = Cache::remember('homepage_critical', 86400, function () {
 
-            $topSelling = Product::with(['packages' => fn($q) => $q->where('status', true)->orderBy('sort_order')])
-                ->where('status', true)->where('is_top_selling', true)->latest()->take(15)->get();
+                $topSelling = Product::select('id', 'name', 'slug', 'featured_image', 'rating', 'rating_count', 'brand')
+                    ->with(['packages' => fn($q) => $q->select('id', 'product_id', 'price', 'compare_price', 'is_default')->where('status', true)->orderBy('sort_order')])
+                    ->where('status', true)->where('is_top_selling', true)->latest()->take(10)->get();
 
-            $trending = Product::with(['packages' => fn($q) => $q->where('status', true)->orderBy('sort_order')])
-                ->where('status', true)->where('is_trending', true)->latest()->take(10)->get();
+                // FIX: Removed the strict select() so it doesn't crash looking for 'image_url'
+                $sliders = Slider::where('is_active', true)->orderBy('order', 'asc')->get();
 
-            $newArrivals = Product::with(['packages' => fn($q) => $q->where('status', true)->orderBy('sort_order')])
-                ->where('status', true)->where('is_new_arrival', true)->latest()->take(10)->get();
+                $banners = Banner::select('id', 'image_url', 'target_link', 'position')->where('is_active', true)->get()->keyBy('position');
 
-            $sliders = Slider::where('is_active', true)->orderBy('order', 'asc')->get();
+                return [
+                    'sliders' => $sliders,
+                    'banners' => $banners,
+                    'top_selling' => ProductMinimalResource::collection($topSelling)->resolve(),
+                ];
+            });
 
-            // 1. Fetch Banners
-            $banners = Banner::where('is_active', true)->get()->keyBy('position');
+            return response()->json($data);
 
-            // 2. Fetch all active home categories
-            $allCategories = Category::where('status', true)
-                ->where('show_on_home', true)
-                ->orderBy('home_sort_order')
-                ->with([
-                    'products' => function ($query) {
-                        $query->where('status', true)
-                            ->latest()
-                            ->take(10)
-                            ->with(['packages' => fn($q) => $q->where('status', true)->orderBy('sort_order')]);
-                    }
-                ])->get();
-
-            // 3. Extract Specific Categories based on your slugs
-            $aiToolsCategory = $allCategories->firstWhere('slug', 'popular-ai-tools');
-            $windowsCategory = $allCategories->firstWhere('slug', 'software-licenses');
-            $videoCategory = $allCategories->firstWhere('slug', 'video-editing-tools');
-
-            // 4. Filter out the specific ones to keep "Other Categories"
-            $otherCategories = $allCategories->filter(function ($cat) {
-                return !in_array($cat->slug, ['popular-ai-tools', 'software-licenses', 'video-editing-tools']);
-            })->values();
-
-            // Return the array of data that needs to be cached
-            return [
-                'sliders' => $sliders,
-                'top_selling' => $topSelling,
-                'trending' => $trending,
-                'new_arrivals' => $newArrivals,
-                'banners' => $banners,
-                // Separated Categories:
-                'ai_tools' => $aiToolsCategory,
-                'windows_tools' => $windowsCategory,
-                'video_tools' => $videoCategory,
-                'other_categories' => $otherCategories,
-            ];
-        });
-
-        // Return the cached data
-        return response()->json($data);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error_message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ], 500);
+        }
     }
 
 
+    // ==========================================
+    // 3. NEW OPTIMIZED HOMEPAGE (DEFERRED DATA)
+    // ==========================================
+    public function homepageDeferred()
+    {
+        try {
+            $data = Cache::remember('homepage_deferred', 86400, function () {
 
+                $productLoader = function ($query) {
+                    $query->select('products.id', 'category_id', 'name', 'slug', 'featured_image', 'rating', 'rating_count', 'brand')
+                        ->where('status', true)->latest()->take(10)
+                        ->with(['packages' => fn($q) => $q->select('id', 'product_id', 'price', 'compare_price', 'is_default')->where('status', true)->orderBy('sort_order')]);
+                };
+
+                $targetSlugs = ['popular-ai-tools', 'software-licenses', 'video-editing-tools'];
+
+                $specificCategories = Category::select('id', 'name', 'slug')
+                    ->where('status', true)->whereIn('slug', $targetSlugs)
+                    ->with(['products' => $productLoader])->get();
+
+                $otherCategories = Category::select('id', 'name', 'slug')
+                    ->where('status', true)->where('show_on_home', true)->whereNotIn('slug', $targetSlugs)
+                    ->orderBy('home_sort_order')->with(['products' => $productLoader])->get();
+
+                $formatCategory = fn($slug) => [
+                    'category' => $specificCategories->firstWhere('slug', $slug),
+                    'products' => ProductMinimalResource::collection($specificCategories->firstWhere('slug', $slug)?->products ?? [])->resolve()
+                ];
+
+                return [
+                    'ai_tools' => $formatCategory('popular-ai-tools'),
+                    'windows_tools' => $formatCategory('software-licenses'),
+                    'video_tools' => $formatCategory('video-editing-tools'),
+                    'other_categories' => $otherCategories->map(fn($cat) => [
+                        'category' => $cat,
+                        'products' => ProductMinimalResource::collection($cat->products)->resolve()
+                    ]),
+                ];
+            });
+
+            return response()->json($data);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'error_message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ], 500);
+        }
+    }
+
+    // ==========================================
+    // 4. SHOW (KEEP EXACTLY AS IT WAS - Powers Product Details)
+    // ==========================================
     public function show($slug)
     {
-        // Cache individual product pages for 3600 seconds (1 hour). 
-        // We use the slug in the cache key so every product has its own cache file.
         $data = Cache::remember('product_' . $slug, 3600, function () use ($slug) {
-
-            // 1. Fetch the main product
             $product = Product::with([
                 'category:id,name,slug',
                 'packages' => function ($q) {
@@ -165,7 +189,6 @@ class PublicProductController extends Controller
                 ->where('status', true)
                 ->firstOrFail();
 
-            // 2. Fetch related products (same category, excluding current product)
             $relatedProducts = Product::with([
                 'packages' => function ($q) {
                     $q->where('status', true)->orderBy('sort_order');
@@ -174,17 +197,15 @@ class PublicProductController extends Controller
                 ->where('category_id', $product->category_id)
                 ->where('id', '!=', $product->id)
                 ->where('status', true)
-                ->take(5) // Limit to 5 related products
+                ->take(5)
                 ->get();
 
-            // 3. Return the array of data that needs to be cached
             return [
                 'product' => $product,
                 'related_products' => $relatedProducts,
             ];
         });
 
-        // Return the cached data
         return response()->json($data);
     }
 }

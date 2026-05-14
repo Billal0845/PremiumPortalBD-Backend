@@ -37,7 +37,7 @@ class ProductController extends Controller
             'is_top_selling' => ['nullable', 'boolean'],
             'is_trending' => ['nullable', 'boolean'],
             'is_new_arrival' => ['nullable', 'boolean'],
-            'featured_image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
+            'featured_image' => ['nullable', 'image', 'mimes:webp', 'max:600'],
             'rating' => ['nullable', 'numeric', 'min:0', 'max:5'],
             'rating_count' => ['nullable', 'integer', 'min:0'],
         ]);
