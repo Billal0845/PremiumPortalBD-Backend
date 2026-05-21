@@ -6,16 +6,11 @@
     RewriteEngine On
 
     ########################################################
-    # FORCE HTTPS + WWW (single canonical origin)
+    # FORCE HTTPS only (API is on api. subdomain, no www)
     ########################################################
 
-    # Force HTTPS
     RewriteCond %{HTTPS} !=on
     RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
-
-    # Force www (only if not already www)
-    RewriteCond %{HTTP_HOST} !^www\. [NC]
-    RewriteRule ^ https://www.%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .
