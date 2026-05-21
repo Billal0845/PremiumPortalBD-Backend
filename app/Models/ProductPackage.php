@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Cache;
 
 class ProductPackage extends Model
 {
@@ -41,5 +42,30 @@ class ProductPackage extends Model
     public function subscriptions(): HasMany
     {
         return $this->hasMany(Subscription::class);
+    }
+
+    protected static function booted()
+    {
+        static::saved(function ($package) {
+            Cache::forget('homepage_critical');
+            Cache::forget('homepage_deferred');
+            Cache::forget('categories_all');
+            Cache::increment('shop_cache_version');
+
+            if ($package->product) {
+                Cache::forget('product_' . $package->product->slug);
+            }
+        });
+
+        static::deleted(function ($package) {
+            Cache::forget('homepage_critical');
+            Cache::forget('homepage_deferred');
+            Cache::forget('categories_all');
+            Cache::increment('shop_cache_version');
+
+            if ($package->product) {
+                Cache::forget('product_' . $package->product->slug);
+            }
+        });
     }
 }

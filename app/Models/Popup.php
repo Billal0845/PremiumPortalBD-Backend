@@ -25,11 +25,11 @@ class Popup extends Model
     protected static function booted()
     {
         static::saved(function () {
-            Cache::forget('homepage_data');
+            Cache::forget('active_popup');
         });
 
         static::deleted(function () {
-            Cache::forget('homepage_data');
+            Cache::forget('active_popup');
         });
     }
 

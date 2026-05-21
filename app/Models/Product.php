@@ -72,15 +72,23 @@ class Product extends Model
     protected static function booted()
     {
         static::saved(function ($product) {
-            Cache::forget('homepage_data');
-            Cache::forget('product_' . $product->slug); // Clears the single product page cache too
+            Cache::forget('homepage_critical');
+            Cache::forget('homepage_deferred');
+            Cache::forget('product_' . $product->slug);
+            Cache::forget('categories_all');
+            Cache::increment('shop_cache_version');
         });
 
         static::deleted(function ($product) {
-            Cache::forget('homepage_data');
+            Cache::forget('homepage_critical');
+            Cache::forget('homepage_deferred');
             Cache::forget('product_' . $product->slug);
+            Cache::forget('categories_all');
+            Cache::increment('shop_cache_version');
         });
     }
 
 
 }
+
+

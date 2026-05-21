@@ -19,67 +19,71 @@ class PublicProductController extends Controller
 
     public function index(Request $request)
     {
-        $query = Product::with([
-            'category:id,name,slug',
-            'packages' => function ($q) {
-                $q->where('status', true)->orderBy('sort_order');
+        $version = Cache::get('shop_cache_version', 1);
+        $cacheKey = 'shop_products_v' . $version . '_' . md5(serialize($request->only(['category', 'search', 'filter', 'sort', 'min_price', 'max_price', 'page'])));
+
+        $products = Cache::remember($cacheKey, 3600, function () use ($request) {
+            $query = Product::with([
+                'category:id,name,slug',
+                'packages' => function ($q) {
+                    $q->where('status', true)->orderBy('sort_order');
+                }
+            ])->where('status', true);
+
+            // Filter by Category Slug
+            if ($request->filled('category')) {
+                $query->whereHas('category', function ($q) use ($request) {
+                    $q->where('slug', $request->category);
+                });
             }
-        ])->where('status', true);
 
-        // Filter by Category Slug
-        if ($request->filled('category')) {
-            $query->whereHas('category', function ($q) use ($request) {
-                $q->where('slug', $request->category);
-            });
-        }
+            // Filter by Search Query
+            if ($request->filled('search')) {
+                $search = $request->search;
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', '%' . $search . '%')
+                        ->orWhere('brand', 'like', '%' . $search . '%');
+                });
+            }
 
-        // Filter by Search Query
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', '%' . $search . '%')
-                    ->orWhere('brand', 'like', '%' . $search . '%');
-            });
-        }
+            // Filter by Homepage Flags
+            if ($request->filled('filter')) {
+                if ($request->filter === 'top-selling')
+                    $query->where('is_top_selling', true);
+                if ($request->filter === 'trending')
+                    $query->where('is_trending', true);
+                if ($request->filter === 'new-arrivals')
+                    $query->where('is_new_arrival', true);
+            }
 
-        // Filter by Homepage Flags
-        if ($request->filled('filter')) {
-            if ($request->filter === 'top-selling')
-                $query->where('is_top_selling', true);
-            if ($request->filter === 'trending')
-                $query->where('is_trending', true);
-            if ($request->filter === 'new-arrivals')
-                $query->where('is_new_arrival', true);
-        }
+            // Filter by Minimum and Maximum Price
+            if ($request->filled('min_price') || $request->filled('max_price')) {
+                $query->whereHas('packages', function ($q) use ($request) {
+                    if ($request->filled('min_price'))
+                        $q->where('price', '>=', $request->min_price);
+                    if ($request->filled('max_price'))
+                        $q->where('price', '<=', $request->max_price);
+                });
+            }
 
-        // Filter by Minimum and Maximum Price
-        if ($request->filled('min_price') || $request->filled('max_price')) {
-            $query->whereHas('packages', function ($q) use ($request) {
-                if ($request->filled('min_price'))
-                    $q->where('price', '>=', $request->min_price);
-                if ($request->filled('max_price'))
-                    $q->where('price', '<=', $request->max_price);
-            });
-        }
+            // Sorting logic
+            $sort = $request->input('sort', 'latest');
+            if ($sort === 'latest') {
+                $query->latest();
+            } elseif ($sort === 'top_rated') {
+                $query->orderBy('rating', 'desc');
+            } elseif ($sort === 'price_low') {
+                $query->orderBy(ProductPackage::select('price')
+                    ->whereColumn('product_id', 'products.id')
+                    ->where('status', true)->orderBy('is_default', 'desc')->limit(1), 'asc');
+            } elseif ($sort === 'price_high') {
+                $query->orderBy(ProductPackage::select('price')
+                    ->whereColumn('product_id', 'products.id')
+                    ->where('status', true)->orderBy('is_default', 'desc')->limit(1), 'desc');
+            }
 
-        // Sorting logic
-        $sort = $request->input('sort', 'latest');
-        if ($sort === 'latest') {
-            $query->latest();
-        } elseif ($sort === 'top_rated') {
-            $query->orderBy('rating', 'desc');
-        } elseif ($sort === 'price_low') {
-            $query->orderBy(ProductPackage::select('price')
-                ->whereColumn('product_id', 'products.id')
-                ->where('status', true)->orderBy('is_default', 'desc')->limit(1), 'asc');
-        } elseif ($sort === 'price_high') {
-            $query->orderBy(ProductPackage::select('price')
-                ->whereColumn('product_id', 'products.id')
-                ->where('status', true)->orderBy('is_default', 'desc')->limit(1), 'desc');
-        }
-
-        // Paginate results
-        $products = $query->paginate(12);
+            return $query->paginate(12);
+        });
 
         return response()->json($products);
     }
@@ -103,21 +107,24 @@ class PublicProductController extends Controller
 
                 $banners = Banner::select('id', 'image_url', 'target_link', 'position')->where('is_active', true)->get()->keyBy('position');
 
+                $categories = Category::where('status', true)
+                    ->withCount('products')
+                    ->latest()
+                    ->get();
+
                 return [
                     'sliders' => $sliders,
                     'banners' => $banners,
                     'top_selling' => ProductMinimalResource::collection($topSelling)->resolve(),
+                    'categories' => $categories,
                 ];
             });
 
             return response()->json($data);
 
         } catch (\Exception $e) {
-            return response()->json([
-                'error_message' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine()
-            ], 500);
+            \Log::error('Failed to load homepage critical data');
+            return response()->json(['message' => 'Failed to load data. Please try again.'], 500);
         }
     }
 
@@ -165,11 +172,8 @@ class PublicProductController extends Controller
             return response()->json($data);
 
         } catch (\Exception $e) {
-            return response()->json([
-                'error_message' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine()
-            ], 500);
+            \Log::error('Failed to load homepage deferred data');
+            return response()->json(['message' => 'Failed to load data. Please try again.'], 500);
         }
     }
 

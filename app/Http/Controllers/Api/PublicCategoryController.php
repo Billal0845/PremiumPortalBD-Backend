@@ -4,16 +4,18 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Category;
+use Illuminate\Support\Facades\Cache;
 
 class PublicCategoryController extends Controller
 {
     public function index()
     {
-        // Added withCount('products') to get the total count
-        $categories = Category::where('status', true)
-            ->withCount('products')
-            ->latest()
-            ->get();
+        $categories = Cache::remember('categories_all', 86400, function () {
+            return Category::where('status', true)
+                ->withCount('products')
+                ->latest()
+                ->get();
+        });
 
         return response()->json([
             'categories' => $categories,

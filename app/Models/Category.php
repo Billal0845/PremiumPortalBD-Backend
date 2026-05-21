@@ -45,12 +45,20 @@ class Category extends Model
 
     protected static function booted()
     {
-        static::saved(function () {
-            Cache::forget('homepage_data');
+        static::saved(function ($category) {
+            Cache::forget('homepage_critical');
+            Cache::forget('homepage_deferred');
+            Cache::forget('categories_all');
+            Cache::increment('shop_cache_version');
+            Cache::forget('homepage_cat_' . $category->slug);
         });
 
-        static::deleted(function () {
-            Cache::forget('homepage_data');
+        static::deleted(function ($category) {
+            Cache::forget('homepage_critical');
+            Cache::forget('homepage_deferred');
+            Cache::forget('categories_all');
+            Cache::increment('shop_cache_version');
+            Cache::forget('homepage_cat_' . $category->slug);
         });
     }
 }

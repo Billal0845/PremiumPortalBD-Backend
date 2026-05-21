@@ -16,11 +16,11 @@ class Slider extends Model
     protected static function booted()
     {
         static::saved(function () {
-            Cache::forget('homepage_data');
+            Cache::forget('homepage_critical');
         });
 
         static::deleted(function () {
-            Cache::forget('homepage_data');
+            Cache::forget('homepage_critical');
         });
     }
 }

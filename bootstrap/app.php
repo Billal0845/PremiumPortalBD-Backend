@@ -19,6 +19,12 @@ return Application::configure(basePath: dirname(__DIR__))
 
             return route('login');
         });
+
+        $middleware->validateCsrfTokens(except: [
+            'api/payment/success',
+            'api/payment/fail',
+            'api/payment/cancel',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

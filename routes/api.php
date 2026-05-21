@@ -18,15 +18,15 @@ use App\Http\Controllers\Api\PublicPopupController;
 
 
 // public
-Route::post('/admin/login', [AuthController::class, 'login']);
-Route::get('/products', [PublicProductController::class, 'index']);
-Route::get('/products/{slug}', [PublicProductController::class, 'show']);
-Route::get('/categories', [PublicCategoryController::class, 'index']);
-Route::get('/categories/{slug}', [PublicCategoryController::class, 'show']);
-Route::post('/orders', [OrderController::class, 'store']);
+Route::post('/admin/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
+Route::get('/products', [PublicProductController::class, 'index'])->middleware('throttle:60,1');
+Route::get('/products/{slug}', [PublicProductController::class, 'show'])->middleware('throttle:60,1');
+Route::get('/categories', [PublicCategoryController::class, 'index'])->middleware('throttle:60,1');
+Route::get('/categories/{slug}', [PublicCategoryController::class, 'show'])->middleware('throttle:60,1');
+Route::post('/orders', [OrderController::class, 'store'])->middleware('throttle:10,1');
 
-Route::get('/homepage/critical', [PublicProductController::class, 'homepageCritical']);
-Route::get('/homepage/deferred', [PublicProductController::class, 'homepageDeferred']);
+Route::get('/homepage/critical', [PublicProductController::class, 'homepageCritical'])->middleware('throttle:60,1');
+Route::get('/homepage/deferred', [PublicProductController::class, 'homepageDeferred'])->middleware('throttle:60,1');
 
 // Route::get('/homepage-data', [PublicProductController::class, 'homepageData']);
 
@@ -34,13 +34,13 @@ Route::get('/payment/success', [OrderController::class, 'paymentSuccess']);
 Route::get('/payment/fail', [OrderController::class, 'paymentFail']);
 Route::get('/payment/cancel', [OrderController::class, 'paymentCancel']);
 
-Route::get('/active-popup', [PublicPopupController::class, 'getActivePopup']);
+Route::get('/active-popup', [PublicPopupController::class, 'getActivePopup'])->middleware('throttle:60,1');
 
 // Banner Management
 
 
 // protected
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'can:admin'])->middleware('throttle:120,1')->group(function () {
   Route::get('/admin/me', [AuthController::class, 'me']);
   Route::post('/admin/logout', [AuthController::class, 'logout']);
 

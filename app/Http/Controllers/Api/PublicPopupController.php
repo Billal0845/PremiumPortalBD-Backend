@@ -4,13 +4,15 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Popup;
+use Illuminate\Support\Facades\Cache;
 
 class PublicPopupController extends Controller
 {
     public function getActivePopup()
     {
-        // Fetch only the active popup
-        $popup = Popup::where('is_active', true)->first();
+        $popup = Cache::remember('active_popup', 86400, function () {
+            return Popup::where('is_active', true)->first();
+        });
 
         if (!$popup) {
             return response()->json(['data' => null]);
